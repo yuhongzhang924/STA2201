@@ -1,0 +1,98 @@
+---
+title: "Homework 1"
+author: "Yuhong Zhang"
+date: today
+date-format: "DD/MM/YY"
+format: 
+    pdf:
+      toc: true
+---
+
+
+```{r}
+#install.packages("tidyverse")
+library(tidyverse)
+```
+
+```{r}
+dm <- read_table("https://www.prdh.umontreal.ca/BDLC/data/ont/Mx_1x1.txt", skip = 2, col_types = "dcddd")
+head(dm)
+```
+# Lab Exercises
+
+Make a new Quarto or R Markdown file to answer these questions, and push to your repository on Github (both the .qmd and pdf file) by Monday 9am. The file should be appropriately named, and in a folder in your repo called 'labs' or something similar. 
+
+1. Plot the ratio of female to male mortality rates over time for ages 10,20,30 and 40 (different color for each age) and change the theme 
+```{r}
+dm|> 
+  filter(Age %in% c(10, 20, 30, 40)) |> 
+  select(Year:Male) |> 
+  mutate(Mortality_Ratio = Female / Male) |>
+  pivot_longer(Female:Male, names_to = "Sex", values_to = "Mortality")|>
+  ggplot(aes(x = Year, y = Mortality_Ratio, color = as.factor(Age))) +
+  geom_line() +
+  labs(title = "Ratio of Female to Male Mortality Rates Over Time",
+       x = "Year",
+       y = "Female to Male Mortality Ratio",
+       color = "Age") +
+  theme_minimal()
+
+```
+
+2. Find the age that has the lowest female mortality rate each year 
+```{r}
+lowestfemalemortality <-dm  |> 
+  group_by(Year)|> 
+  arrange(Female)|> 
+  slice(1) |> 
+  select(Year, Age, Female)
+unique(lowestfemalemortality)
+```
+
+3. Use the `summarize(across())` syntax to calculate the standard deviation of mortality rates by age for the Male, Female and Total populations. 
+
+```{r}
+dm|>
+  group_by(Age) |>
+  summarize(across(2:4, ~ sd(., na.rm = TRUE)))
+
+```
+
+
+4. The Canadian HMD also provides population sizes over time (https://www.prdh.umontreal.ca/BDLC/data/ont/Population.txt). Use these to calculate the population weighted average mortality rate separately for males and females, for every year. Make a nice line plot showing the result (with meaningful labels/titles) and briefly comment on what you see (1 sentence). Hint: `left_join` will probably be useful here. 
+
+```{r}
+dl <- read_table("https://www.prdh.umontreal.ca/BDLC/data/ont/Population.txt", skip = 2, col_types = "dcddd")
+head(dl)
+total<-
+  left_join(dl,dm, by = c("Year", "Age"))|>
+  mutate(Weighted_Male_Mortality = Male.x * Male.y,
+         Weighted_Female_Mortality = Female.x * Female.y) |>
+   drop_na() |>
+  group_by(Year) |>
+  mutate(Avg_Male_Mortality = sum(Weighted_Male_Mortality) / sum(Total.x),
+            Avg_Female_Mortality = sum(Weighted_Female_Mortality) / sum(Total.x))
+
+total |>
+  ggplot(aes(x = Year)) +
+  geom_line(aes(y = Avg_Male_Mortality, color = "Male")) +
+  geom_line(aes(y = Avg_Female_Mortality, color = "Female")) +
+  labs(title = "Population Weighted Average Mortality Rate",
+       x = "Year",
+       y = "Weighted Mortality Rate") +
+  scale_color_manual(values = c("Male" = "blue", "Female" = "green")) 
+
+```
+
+From the plot, it is obvious that both male and female population weighted average mortality rates have generally decreased over the plot showed time period (mostly from 1921 to 2000) and the rate of woman is lower than male in general. And after 2000 there was slight increase in both female and male mortality rates, maybe because the technology develop people 
+
+5. Write down using appropriate notation, and run a simple linear regression with logged mortality rates as the outcome and age (as a continuous variable) as the covariate, using data for females aged less than 106 for the year 2000. Interpret the coefficient on age. 
+
+```{r}
+dm$Age <- as.numeric(as.character(dm$Age))
+sub<- dm |>
+  filter(Year == 2000, Age < 106)
+model <- lm(log(Female) ~ Age, data = sub)
+summary(model)
+```
+From the result of linear regression, the coefficient of age means that when age increases by one unit (increase one year), the mean of logged mortality rates will increase by 0.086891.
