@@ -15,7 +15,8 @@ library(tidyverse)
 ```
 
 ```{r}
-dm <- read_table("https://www.prdh.umontreal.ca/BDLC/data/ont/Mx_1x1.txt", skip = 2, col_types = "dcddd")
+dm <- read_table("https://www.prdh.umontreal.ca/BDLC/data/ont/Mx_1x1.txt",
+                 skip = 2, col_types = "dcddd")
 head(dm)
 ```
 # Lab Exercises
@@ -42,16 +43,17 @@ dm|>
 2. Find the age that has the lowest female mortality rate each year 
 ```{r}
 lowestfemalemortality <-dm  |> 
-  group_by(Year)|> 
-  arrange(Female)|> 
-  slice(1) |> 
+  group_by(Year)|>
+  filter(Female==min(Female,na.rm = TRUE))|>
   select(Year, Age, Female)
-unique(lowestfemalemortality)
+lowestfemalemortality
 ```
+Since there may be some age groups in a year that have the same female mortality rate and are the lowest,such as in 1922, age of 104 and 105 both obtain the lowest female mortality rate (0.00). Therefore, there are more than 99 elements in Year in this case.
 
 3. Use the `summarize(across())` syntax to calculate the standard deviation of mortality rates by age for the Male, Female and Total populations. 
 
 ```{r}
+dm$Age <- as.numeric(as.character(dm$Age))
 dm|>
   group_by(Age) |>
   summarize(across(2:4, ~ sd(., na.rm = TRUE)))
@@ -62,16 +64,19 @@ dm|>
 4. The Canadian HMD also provides population sizes over time (https://www.prdh.umontreal.ca/BDLC/data/ont/Population.txt). Use these to calculate the population weighted average mortality rate separately for males and females, for every year. Make a nice line plot showing the result (with meaningful labels/titles) and briefly comment on what you see (1 sentence). Hint: `left_join` will probably be useful here. 
 
 ```{r}
-dl <- read_table("https://www.prdh.umontreal.ca/BDLC/data/ont/Population.txt", skip = 2, col_types = "dcddd")
-head(dl)
+da <- read_table("https://www.prdh.umontreal.ca/BDLC/data/ont/Population.txt", 
+                 skip = 2, col_types = "dcddd")
+dm$Age <- as.character(dm$Age)
 total<-
-  left_join(dl,dm, by = c("Year", "Age"))|>
+  left_join(da,dm, by = c("Year", "Age"))|>
+  drop_na() |>
+  group_by(Year) |>
   mutate(Weighted_Male_Mortality = Male.x * Male.y,
          Weighted_Female_Mortality = Female.x * Female.y) |>
-   drop_na() |>
-  group_by(Year) |>
-  mutate(Avg_Male_Mortality = sum(Weighted_Male_Mortality) / sum(Total.x),
-            Avg_Female_Mortality = sum(Weighted_Female_Mortality) / sum(Total.x))
+  mutate(Avg_Male_Mortality = sum(Weighted_Male_Mortality,na.rm=TRUE) 
+         / sum(Male.x, na.rm=TRUE),
+            Avg_Female_Mortality = sum(Weighted_Female_Mortality,na.rm=TRUE)
+         / sum(Female.x,na.rm=TRUE))
 
 total |>
   ggplot(aes(x = Year)) +
@@ -84,7 +89,7 @@ total |>
 
 ```
 
-From the plot, it is obvious that both male and female population weighted average mortality rates have generally decreased over the plot showed time period (mostly from 1921 to 2000) and the rate of woman is lower than male in general. And after 2000 there was slight increase in both female and male mortality rates, maybe because the technology develop people 
+From the plot, it is obvious that both male and female population weighted average mortality rates have generally decreased over the plot showed time period (mostly from 1921 to 2000) and the rate of woman is lower than male in general，and around 2008, there was slight increase in both female and male mortality rates, maybe because the technology development and healthcare improvement, people can live longer, however, because the older population have higher mortality rates, development in health care could offset this effect, thus the mortality rates still much lower than before even if there is a small increase.
 
 5. Write down using appropriate notation, and run a simple linear regression with logged mortality rates as the outcome and age (as a continuous variable) as the covariate, using data for females aged less than 106 for the year 2000. Interpret the coefficient on age. 
 
@@ -95,4 +100,8 @@ sub<- dm |>
 model <- lm(log(Female) ~ Age, data = sub)
 summary(model)
 ```
-From the result of linear regression, the coefficient of age means that when age increases by one unit (increase one year), the mean of logged mortality rates will increase by 0.086891.
+From the result of linear regression, the coefficient of age means that when age of woman increases by one unit (increase one year) and all other covariates are held constant (there is no other covariate in this case) , the mean of logged mortality rates will increase by 0.086891.
+
+
+
+
