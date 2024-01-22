@@ -1,0 +1,251 @@
+---
+title: "EDA and data visualization"
+author: "YUHONG ZHANG"
+date: today
+date-format: "DD/MM/YY"
+execute: 
+  warning: false
+  message: false
+format: 
+    pdf:
+      toc: true
+      number-sections: true
+---
+
+
+1. Using the `delay_2022` data, plot the five stations with the highest mean delays. Facet the graph by `line`
+```{r}
+library(opendatatoronto)
+library(tidyverse)
+library(stringr)
+library(skimr) # EDA
+library(visdat) # EDA
+library(janitor)
+library(lubridate)
+library(ggrepel)
+```
+
+1. Using the delay_2022 data, plot the five stations with the highest mean delays.
+Facet the graph by line .
+```{r}
+library(ggplot2)
+library(dplyr)
+library(readr)
+delay_2022 <- read_csv("delay_2022.csv")
+
+mean_delays <- delay_2022 |>
+  group_by(station) |>
+  summarize(mean_delay = mean(min_delay, na.rm = TRUE)) |>
+  arrange(desc(mean_delay)) |>
+  head(5)
+mean_delays
+
+delay_2022_filtered <- delay_2022 |>
+  inner_join(mean_delays, by = "station")
+
+ggplot(delay_2022_filtered, aes(x = station, y = mean_delay)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(vars(line), 
+             scales = "free_y",
+             nrow = 4) +
+  coord_flip()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(title = "Top 5 Stations with the Highest Mean Delays", 
+       x = "Station", y = "Mean Delay (minutes)")
+
+```
+
+
+2. Restrict the `delay_2022` to delays that are greater than 0 and to only have delay reasons that appear in the top 50% of most frequent delay reasons. Perform a regression to study the association between delay minutes, and two covariates: line and delay reason. It's up to you how to specify the model, but make sure it's appropriate to the data types. Comment briefly on the results, including whether results generally agree with the exploratory data analysis above.
+
+
+```{r}
+#Identify the top 50% of delay reasons
+delay_2022_50 <- delay_2022 %>%
+  filter(min_delay > 0) %>%
+  group_by(code_red) %>%
+  summarise(n = n()) %>%
+  mutate(freq = n / sum(n),na.rm = TRUE) %>%
+  arrange(desc(freq)) %>%
+  filter(cumsum(freq) <= 0.5,na.rm = TRUE) %>%
+  select(code_red) 
+#Filter the original dataset based on the top 50% delay reasons and min_delay>0
+delay_2022_filtered<-delay_2022 %>%
+  filter(min_delay>0, code_red %in% delay_2022_50$code_red)
+
+model <- lm(min_delay ~ line + code_red, data = delay_2022_filtered)
+summary(model)
+unique(delay_2022_filtered$line)
+
+```
+Based on the result, since min_delay is a continuous variable and will be influenced by reasons, so we fit a linear regression there. We can find the results do not generally agree with the exploratory data analysis above. Since in the last question, the five stations with the highest mean delays always occurs on Line YU and BD, however, if we check the coefficient, when line is YU and code_red keeps the unchanged, compare to line is BD (baseline), the average estimated delay time will decrease by 0.3291 minutes, which is not consistent with the eda result. Meanwhile, the r square is about 0.07, which means the model is not fitted data well, so we need to find a better model to fit data.
+\newpage
+
+3. Using the `opendatatoronto` package, download the data on mayoral campaign contributions for 2014 and clean it up. Hints:
+    + find the ID code you need for the package you need by searching for 'campaign' in the `all_data` tibble above
+    + you will then need to `list_package_resources` to get ID for the data file
+    + note: the 2014 file you will get from `get_resource` has a bunch of different campaign contributions, so just keep the data that relates to the Mayor election
+    + clean up the data format (fixing the parsing issue and standardizing the column names using `janitor`)
+    
+```{r}
+library(opendatatoronto)
+library(janitor)
+all_data <- search_packages("campaign")
+campaign_data_id <- all_data$id
+campaign_data_id
+resources <- list_package_resources(campaign_data_id[1])
+resources
+mayor_campaign_data <- get_resource('8b42906f-c894-4e93-a98e-acac200f34a4')
+mayor_contributions <-  mayor_campaign_data[[2]]
+colnames(mayor_contributions) <- as.character(mayor_contributions[1, ])
+mayor_contributions <- mayor_contributions[-1, ]
+rownames(mayor_contributions) <- NULL
+clean_mayor_contributions <- mayor_contributions %>% 
+  clean_names()
+clean_mayor_contributions
+
+```
+
+
+
+4. Summarize the variables in the dataset. Are there missing values, and if so, should we be worried about them? Is every variable in the format it should be? If not, create new variable(s) that are in the right format.
+
+```{r}
+skim(clean_mayor_contributions)
+clean_mayor_contributions <- mayor_contributions %>% 
+  clean_names()
+na_columns <- sapply(clean_mayor_contributions, function(x) all(!is.na(x)))
+df_cleaned <- clean_mayor_contributions[, na_columns]
+df_cleaned$contribution_amount<-as.numeric(as.character(df_cleaned$contribution_amount))
+skim(df_cleaned)
+```
+
+There are some missing values, some columns are almost empty, which are 'contributors_address', '	goods_or_service_desc', '	relationship_to_candidate', '	president_business_manager', 'authorized_representative' and 'ward', may be due to lack of information or privacy reasons. The variable type of 'contribution_amount' is not correct, since it describes the amount of money of contribution, so it should be numeric variable instead of character, so I change the type of it as numeric. For other variables, the types of them are character which are correct( some can be changed to factor, such as 'contribution_type_desc' and 'contributor_type_desc'), since they formed by letters or mixing letter and numbers.
+
+
+5. Visually explore the distribution of values of the contributions. What contributions are notable outliers? Do they share a similar characteristic(s)? It may be useful to plot the distribution of contributions without these outliers to get a better sense of the majority of the data. 
+
+```{r}
+df_cleaned$contribution_amount<-as.numeric(df_cleaned$contribution_amount)
+
+ggplot(df_cleaned, aes(x = contribution_amount)) +
+  geom_dotplot() +
+  labs(title = "Distribution of Contribution Values", 
+       x = "Contribution Amount", y = "Frequency")
+
+ggplot(df_cleaned,aes(contribution_amount)) + geom_dotplot() + facet_wrap(~candidate, scales = "free_y")
+
+IQR(df_cleaned$contribution_amount)
+
+df_cleaned%>% filter(contribution_amount>=1100) %>%
+  arrange(-contribution_amount)%>%
+  head(10)
+boxplot(df_cleaned$contribution_amount)
+
+outlier4<-df_cleaned%>%
+         filter(contribution_amount<=1100)
+ggplot(outlier4, aes(x = contribution_amount)) +
+  geom_histogram() +
+  labs(title = "Distribution of Contribution Values(<=1100)", 
+       x = "Contribution Amount", y = "Frequency")
+
+outlier5<-df_cleaned%>%
+         filter(contribution_amount<4000)
+ggplot(outlier5, aes(x = contribution_amount)) +
+  geom_histogram() +
+  labs(title = "Distribution of Contribution Values(self)", 
+       x = "Contribution Amount", y = "Frequency")
+
+outlier6<-df_cleaned%>%
+         filter(contribution_amount<501)
+ggplot(outlier6, aes(x = contribution_amount)) +
+  geom_histogram() +
+  labs(title = "Distribution of Contribution Values (Q3)",
+       x = "Contribution Amount", y = "Frequency")
+
+```
+From previous question, we know the mean is 607.9521 and 75th percentile is 500 and max is 508224.7, from previous courses, we know the outlier is greater than Q3 + (1.5 * IQR) = 500+400*1.5 = 1100. Some outliers, such as self donation of 508224.7 by Doug Ford and 78804.8, 50000.0 and some other notable outliers, we can find that all donations that greater than 4000 are contributed by the candidates themselves. These outliers lead the graph shows right skewed. If we filter for less than 1100 contributions, we see that the distribution is less skewed and get a better sense of the majority of the data. 
+
+6. List the top five candidates in each of these categories:
+    + total contributions
+    + mean contribution
+    + number of contributions
+```{r}
+candidate_stats <- df_cleaned %>%
+  group_by(candidate) %>%
+  summarise(
+    total_contributions = sum(contribution_amount, na.rm = TRUE),
+    mean_contribution = mean(contribution_amount, na.rm = TRUE),
+    number_of_contributions = n()
+  ) 
+
+
+top_total_contributions <- candidate_stats %>% 
+  arrange(desc(total_contributions)) %>% 
+  select(candidate,total_contributions)%>%
+  head(5)
+
+top_mean_contribution <- candidate_stats %>% 
+  arrange(desc(mean_contribution)) %>% 
+  select(candidate,mean_contribution)%>%
+  head(5)
+
+top_number_of_contributions <- candidate_stats %>% 
+  arrange(desc(number_of_contributions)) %>% 
+  select(candidate,number_of_contributions)%>%
+  head(5)
+
+top_total_contributions
+top_mean_contribution
+top_number_of_contributions
+```
+    
+    
+
+7. Repeat 6 but without contributions from the candidates themselves.
+```{r}
+df_without_self_contributions <- df_cleaned %>%
+  filter(contributors_name != candidate)
+
+candidate_stats_self <- df_without_self_contributions %>%
+  group_by(candidate) %>%
+  summarise(
+    total_contributions_self = sum(contribution_amount, na.rm = TRUE),
+    mean_contribution_self = mean(contribution_amount, na.rm = TRUE),
+    number_of_contributions_self = n()
+  )
+
+top_total_contributions_self <- candidate_stats_self %>% 
+  arrange(desc(total_contributions_self)) %>% 
+  select(candidate,total_contributions_self)%>%
+  head(5)
+
+top_mean_contribution_self <- candidate_stats_self %>% 
+  arrange(desc(mean_contribution_self)) %>% 
+  select(candidate,mean_contribution_self)%>%
+  head(5)
+
+top_number_of_contributions_self <- candidate_stats_self %>% 
+  arrange(desc(number_of_contributions_self)) %>% 
+  select(candidate,number_of_contributions_self)%>%
+  head(5)
+
+top_total_contributions_self
+top_mean_contribution_self
+top_number_of_contributions_self
+
+```
+
+8. How many contributors gave money to more than one candidate? 
+```{r}
+contributors_multiple_candidates <- df_cleaned %>%
+  group_by(contributors_name) %>%
+  summarise(unique_candidates = n_distinct(candidate)) 
+
+num_contributors_multiple_candidates <- sum(contributors_multiple_candidates$unique_candidates > 1)
+
+num_contributors_multiple_candidates
+```
+There are 184 contributors gave money to more than one candidate.
+
+
