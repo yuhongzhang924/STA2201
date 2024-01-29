@@ -1,5 +1,6 @@
 ---
 title: "Week 3: Intro to Bayes and git branches"
+author: "YUHONG ZHANG"
 date: today
 date-format: "DD/MM/YY"
 format: pdf
@@ -58,8 +59,8 @@ credible_interval1 <- qbeta(c(0.025, 0.975), alpha_post1, beta_post1)
 posterior_mean1
 credible_interval1
 ```
-The interpretation of prior in is $\theta$ Beta(10,10) is that before data is observed, the unknown parameter is modeled as a
-random variable $\theta$ follows a distribution Beta(10,10), we assuming we know more in this question, since more people will be observed in this case (20-2=18 more women), so we will know more information.
+The interpretation of prior on $\theta$ is that before data is observed, the unknown parameter is modeled as a
+random variable $\theta$ follows a distribution Beta(10,10), we assuming we know more in this question, since more people will be observed in this case (20-2=18 more women) and also in Question 2, the prior is Beta(1,1) which is flat and we consider all values of $\theta$ equally, so we will know more information when Beta(10,10) is prior on $\theta$.
 
 ## Question 4
 
@@ -72,8 +73,8 @@ Comment on what you observe.
 
 ```{r}
 theta_values <- seq(0, 1, by = 0.001)
-p <- x/n
-data <- data.frame(theta = theta_values,dbinom(118, size = n, prob = p))
+likelihood <- dbinom(x, size = n, prob = theta_values)
+data <- data.frame(theta = theta_values, likelihood = likelihood)
 ggplot(data, aes(x = theta_values, y = likelihood)) +
   geom_histogram(stat = "identity",aes(color = "Likelihood")) +
   stat_function(fun = dbeta, args = list(shape1 = 1, shape2 = 1), aes(color = "Beta(1,1) prior")) + 
@@ -83,7 +84,7 @@ ggplot(data, aes(x = theta_values, y = likelihood)) +
   theme_minimal()
 
 ```
-From the plot, we can find that the peak of likelihood around 0.9 and shows a slightly left skewed trend. For Beta(1,1) prior, which implies that before observing data,we consider all values of $\theta$ equally, thus it is a noninformative prior, however, for Beta(10,10) prior, we can find the peak of it is at $\theta$=0.5, which shows that women indicating they are happy are most likely around 50%. Moreover, we noticed that after observing data, the posterior is shifting to around 0.9 which is closer to the peak of data.
+From the plot, we can find that the peak of likelihood around 0.9 and shows a slightly left skewed trend. For Beta(1,1) prior, the plot is flat, which implies that before observing data, we consider all values of $\theta$ equally, however, for Beta(10,10) prior, we can find the peak of it is at $\theta$=0.5, which shows that women indicating they are happy are most likely around 50% and be more informative. Moreover, we noticed that after observing data, both posteriors skewed and shifted to around 0.9 which is closer to the peak of likelihood, and the Beta(1,1) posterior is much closer to the likelihood compares to Beta(10,10) posterior.
 
 
 ## Question 5
@@ -98,6 +99,8 @@ probability
 
 ```
 The posterior is still Beta(a+1, b+1), the probability is 1.146058e-42.
+
+
 ## Question 6
 
 (No R code required) A study is performed to estimate the effect of a simple training program on basketball free-throw shooting. A random sample of 100 college students is recruited into the study. Each student first shoots 100 free-throws to establish a baseline success probability. Each student then takes 50 practice shots each day for a month. At the end of that time, each student takes 100 shots for a final measurement. Let $\theta$ be the average improvement in success probability. $\theta$ is measured as the final proportion of shots made minus the initial proportion of shots made. 
@@ -109,6 +112,6 @@ Given two prior distributions for $\theta$ (explaining each in a sentence):
 - A subjective/informative prior based on your best knowledge
 
 
-The noninformative prior for $\theta$ is uniform(0,1), since the uniform(0,1) is flat and implies that we consider the same probability to all possible values of improvement, so uniform(0,1) should be noninformative prior, however, I think the uniform(-1,1) can also be the reasonable noninformative prior, since the average improvement in success probability can also be negative, ie, between -100% to 100%, since the uniform(-1,1) is flat and  implies that we consider the same probability to all possible values of improvement, which implies uniform(-1,1) can also be the noninformative prior.
+The noninformative prior for $\theta$ is uniform(0,1), since the uniform(0,1) is flat and implies that we consider the same probability to all possible values of improvement, so uniform(0,1) should be noninformative prior, however, I think the uniform(-1,1) can also be the reasonable noninformative prior, since the average improvement in success probability can also be negative, ie, between -100% to 100%, since the uniform(-1,1) is flat and implies that we consider the same probability to all possible values of improvement, which implies uniform(-1,1) can also be the noninformative prior.
 
 A subjective/informative prior for $\theta$ can be beta(3,3), for beta(3,3), we will observed 3 successes and 3 failures and the mean is 0.5 and the variance about 0.036, which means that it assumes that the most likely improvement in success is 50% and it will variate by 0.036, since practicing will increase the improvement in success probability, I think that will be an informative prior.
